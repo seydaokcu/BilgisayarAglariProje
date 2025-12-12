@@ -66,7 +66,7 @@ for _, row in edge_df.iterrows():
     v=int(row["dst"]) #dst = edge’in bittiği düğüm (destination)
 
     G.add_edge(u,v)
-    G.edges[u,v]["bandwith"]=row["capacity_mbps"]
+    G.edges[u,v]["bandwidth"]=row["capacity_mbps"]
     G.edges[u,v]["link_delay"]=row["delay_ms"]
     G.edges[u,v]["link_reliability"]=row["r_link"]
 
