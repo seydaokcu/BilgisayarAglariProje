@@ -2,6 +2,8 @@ import numpy as np
 import networkx as nx
 import random 
 import math
+import time
+from tqdm import tqdm
 
 import Ag_olusturma as ag
 
@@ -84,7 +86,7 @@ class QLearningAgent:
     def train(self, start_node, goal_node, episodes=1000):
         print(f"Eğitim Başlıyor: {start_node} -> {goal_node}")
         
-        for episode in range(episodes):
+        for episode in tqdm(range(episodes), desc="Eğitim İlerlemesi"):
             state = start_node
             steps = 0
             
@@ -132,9 +134,12 @@ if __name__ == "__main__":
     # 3. Ajanı Eğit
     start = 0
     goal = 5
+    t0 = time.time()
     agent.train(start_node=start, goal_node=goal, episodes=1000)
+    t1 = time.time() 
     # 4. En İyi Yolu Al
     path = agent.get_best_path(start, goal)
+    print(f"Eğitim Süresi: {t1 - t0:.2f} saniye")
     print("-" * 30)
     print(f"Bulunan Yol: {path}")
 
