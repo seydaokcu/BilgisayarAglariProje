@@ -29,10 +29,16 @@ class QLearningAgent:
             self.q_table[node] = {}
             for neighbor in self.graph.neighbors(node):
                 self.q_table[node][neighbor] = 0.0
-
+    
+    #================================
+    # Q-değerini alma fonksiyonu
+    #================================
     def get_q_value(self, state, action):
         return self.q_table.get(state, {}).get(action, 0.0)
 
+    #================================
+    # Ödül hesaplama fonksiyonu
+    #================================
     def calculate_reward(self, u, v):
         # Node ve Edge verileri çekme
         edge_data = self.graph.edges[u, v]
@@ -58,6 +64,9 @@ class QLearningAgent:
         
         return -total_cost
 
+    #================================
+    # Eylem seçimi (ε-greedy)
+    #================================
     def choose_action(self, state):
         neighbors = list(self.graph.neighbors(state))
         if not neighbors: return None
@@ -70,6 +79,9 @@ class QLearningAgent:
             best_actions = [n for n, q in q_values.items() if q == max_q]
             return random.choice(best_actions)
 
+    #================================
+    # Q-değerini güncelleme
+    #================================
     def update_q_value(self, state, action, reward, next_state):
         next_neighbors = list(self.graph.neighbors(next_state))
         if next_neighbors:
@@ -83,6 +95,9 @@ class QLearningAgent:
         new_q = current_q + self.learning_rate * (reward + self.discount_factor * best_next_q - current_q)
         self.q_table[state][action] = new_q
 
+    #================================
+    # Eğitim fonksiyonu
+    #================================
     def train(self, start_node, goal_node, episodes=1000):
         print(f"Eğitim Başlıyor: {start_node} -> {goal_node}")
         
@@ -105,6 +120,9 @@ class QLearningAgent:
             
             self.exploration_rate *= self.exploration_decay
 
+    #================================
+    # En iyi yolu bulma
+    #================================
     def get_best_path(self, start_node, goal_node):
         path = [start_node]
         curr = start_node
@@ -125,24 +143,53 @@ class QLearningAgent:
             if len(path) > 50: break 
             
         return path
+#================================
+# Q-Learn algoritmasını çalıştıran fonksiyon
+#================================
+def run_qlearn(source, target, episodes=1000):
+    start_total_time = time.time()
 
-if __name__ == "__main__":
-    # 1. Ağ Oluştur
-    my_graph = ag.G
-    # 2. Ajanı Başlat
-    agent = QLearningAgent(my_graph)
-    # 3. Ajanı Eğit
-    start = 0
-    goal = 5
+    graph = ag.G
+    agent = QLearningAgent(graph)
     t0 = time.time()
-    agent.train(start_node=start, goal_node=goal, episodes=1000)
-    t1 = time.time() 
-    # 4. En İyi Yolu Al
-    path = agent.get_best_path(start, goal)
-    print(f"Eğitim Süresi: {t1 - t0:.2f} saniye")
-    print("-" * 30)
-    print(f"Bulunan Yol: {path}")
+    agent.train(start_node=source, goal_node=target, episodes=episodes)
+    t1 = time.time()
+    train_time = round(t1 - t0, 3)
+    best_path = agent.get_best_path(source, target)
+    
+    if best_path:
+        delay = ag.total_delay(best_path, graph)
+        reliability = ag.total_reliability(best_path, graph)
+        resource_cost = ag.weighted_sum_method(best_path, graph)
+    else:
+        delay = float('inf')
+        reliability = 0.0
+        resource_cost = float('inf')
 
-    # 5. Toplam Gecikmeyi Hesapla
-    if path:
-        print(f"Toplam Gecikme: {ag.total_delay(path, my_graph):.2f}")
+    end_total_time = time.time()
+    total_execution_time = round(end_total_time - start_total_time, 3)
+    
+    return {
+        "best_path": best_path,
+        "delay": delay,
+        "reliability": reliability,
+        "resource_cost": resource_cost,
+        "train_time": train_time,
+        "total_execution_time": total_execution_time
+    }
+
+#------------------------------------------------
+# ÖRNEK KISMI
+#------------------------------------------------
+if __name__ == "__main__":
+    source = 0  
+    target = 200
+
+    result = run_qlearn(source, target, episodes=1000)
+
+    print("En iyi yol:", result["best_path"])
+    print("Delay:", result["delay"])
+    print("Reliability:", result["reliability"])
+    print("Resource Cost:", result["resource_cost"])
+    print("Eğitim Süresi (s):", result["train_time"])
+    print("Toplam Çalışma Süresi (s):", result["total_execution_time"])
