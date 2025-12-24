@@ -79,22 +79,42 @@ print(demand_df.head())
 
 
 import math
-def total_delay(path, G): # toplam gecikmeyi hesapşar 
-    delay = 0.0
-    
-    # Edge delay
+def total_delay(path, G):
+    """
+    TotalDelay(P) = 
+        (Yol üzerindeki tüm kenarların link_delay toplamı)
+      + (Kaynak ve hedef hariç ara düğümlerin processing_delay toplamı)
+
+    Varsayım:
+    - path, daha önce is_valid_path(...) ile doğrulanmıştır
+    - Graf yönsüzdür (nx.Graph)
+    """
+
+    # Geçersiz veya çok kısa yol kontrolü
+    if path is None or len(path) < 2:
+        return 0.0
+
+    total_delay_value = 0.0
+
+    # 1) Kenar (link) gecikmelerini topla
+    # path = [n0, n1, n2, n3] ise:
+    # (n0,n1), (n1,n2), (n2,n3) kenarları gezilir
     for i in range(len(path) - 1):
         u = path[i]
         v = path[i + 1]
-        delay += G.edges[u, v]["link_delay"]  #link_delay : edge(kenar) gecikmelerini toplar
 
-    # Node processing delay (source ve target hariç)
-    for node in path[1:-1]:
-        delay += G.nodes[node]["processing_delay"] #processing_delay : Path içindeki ORTA düğümler (source ve target hariç) işlem gecikmesi yaratır.
+        link_delay = float(G.edges[u, v]["link_delay"])
+        total_delay_value += link_delay
 
-    return delay
+    # 2) Ara düğümlerin işlem gecikmelerini topla (S ve D hariç)
+    # path[1:-1] → sadece ara düğümler
+    for i in range(1, len(path) - 1):
+        node = path[i]
 
+        processing_delay = float(G.nodes[node]["processing_delay"])
+        total_delay_value += processing_delay
 
+    return total_delay_value
 
 
 def reliability_cost(path, G):
@@ -246,3 +266,4 @@ if valid:
     print("Weighted Cost:", weighted_sum_method(example_path, G))
 else:
     print("Bu yol grafik içinde mevcut değil.")
+
