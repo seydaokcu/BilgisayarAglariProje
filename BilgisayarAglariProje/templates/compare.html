@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Algoritma Karşılaştırma - QoS Routing</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+    />
+
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f8fafc;
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+      }
+    </style>
+  </head>
+  <body class="text-slate-800 pb-12">
+    <nav class="bg-white border-b border-slate-200 py-4 mb-8">
+      <div class="container mx-auto px-6 flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-blue-600 text-3xl"
+            >bar_chart</span
+          >
+          <h1 class="text-xl font-extrabold tracking-tight">
+            Algoritma Karşılaştırma
+          </h1>
+        </div>
+        <a
+          href="/"
+          class="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-medium transition-colors"
+        >
+          <span class="material-symbols-outlined">arrow_back</span>
+          Ana Sayfa
+        </a>
+      </div>
+    </nav>
+
+    <main class="container mx-auto px-6">
+      <!-- Input Panel -->
+      <div
+        class="glass-card p-6 rounded-2xl shadow-sm border border-slate-200 mb-8"
+      >
+        <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2">
+          <span class="material-symbols-outlined text-blue-500">settings</span>
+          Test Parametreleri
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div>
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-2"
+              >Kaynak (S)</label
+            >
+            <input
+              id="source"
+              type="number"
+              value="8"
+              class="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-2"
+              >Hedef (D)</label
+            >
+            <input
+              id="target"
+              type="number"
+              value="44"
+              class="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-2"
+              >Min. Bandwidth (Mbps)</label
+            >
+            <input
+              id="min_bandwidth"
+              type="number"
+              value="100"
+              class="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+          <div class="flex items-end">
+            <button
+              id="runCompare"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg shadow-md transition-all flex items-center justify-center gap-2"
+            >
+              <span class="material-symbols-outlined">analytics</span>
+              Benchmark Başlat
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div
+        id="loading"
+        class="hidden flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-sm border border-slate-100 italic text-slate-400"
+      >
+        <div
+          class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"
+        ></div>
+        Simülasyon çalıştırılıyor, lütfen bekleyin...
+      </div>
+
+      <!-- Dashboard Content -->
+      <div id="results" class="hidden animate-in fade-in duration-500">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          <!-- Total Cost Chart -->
+          <div
+            class="glass-card p-6 rounded-2xl shadow-sm border border-slate-200"
+          >
+            <h4 class="font-bold text-slate-600 mb-4">
+              Toplam Ağırlıklı Maliyet (Düşük Daha İyi)
+            </h4>
+            <canvas id="costChart"></canvas>
+          </div>
+
+          <!-- Reliability Chart -->
+          <div
+            class="glass-card p-6 rounded-2xl shadow-sm border border-slate-200"
+          >
+            <h4 class="font-bold text-slate-600 mb-4">
+              Güvenilirlik Oranı % (Yüksek Daha İyi)
+            </h4>
+            <canvas id="relChart"></canvas>
+          </div>
+
+          <!-- Delay Chart -->
+          <div
+            class="glass-card p-6 rounded-2xl shadow-sm border border-slate-200"
+          >
+            <h4 class="font-bold text-slate-600 mb-4">
+              Uçtan Uca Gecikme (ms)
+            </h4>
+            <canvas id="delayChart"></canvas>
+          </div>
+
+          <!-- Resource Cost Chart -->
+          <div
+            class="glass-card p-6 rounded-2xl shadow-sm border border-slate-200"
+          >
+            <h4 class="font-bold text-slate-600 mb-4">
+              Kaynak Kullanım Maliyeti
+            </h4>
+            <canvas id="resChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Path Summary Table -->
+        <div
+          class="glass-card p-6 rounded-2xl shadow-sm border border-slate-200"
+        >
+          <h4 class="font-bold text-slate-600 mb-4">Algoritma Rotaları</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left">
+              <thead>
+                <tr
+                  class="text-xs font-bold text-slate-400 border-b border-slate-100 uppercase tracking-wider"
+                >
+                  <th class="pb-3 px-4">Algoritma</th>
+                  <th class="pb-3 px-4">Yol Optimizasyonu</th>
+                  <th class="pb-3 px-4">Rota Detayı</th>
+                </tr>
+              </thead>
+              <tbody id="pathTableBody">
+                <!-- Rows injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      let charts = {};
+
+      document
+        .getElementById("runCompare")
+        .addEventListener("click", async () => {
+          const btn = document.getElementById("runCompare");
+          const resultsDiv = document.getElementById("results");
+          const loadingDiv = document.getElementById("loading");
+
+          btn.disabled = true;
+          loadingDiv.classList.remove("hidden");
+          resultsDiv.classList.add("hidden");
+
+          const payload = {
+            source: document.getElementById("source").value,
+            target: document.getElementById("target").value,
+            min_bandwidth: document.getElementById("min_bandwidth").value,
+            w_rel: 0.33,
+            w_delay: 0.33,
+            w_res: 0.34,
+          };
+
+          try {
+            const response = await fetch("/api/compare_all", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+
+            const data = await response.json();
+            if (data.results) {
+              renderDashboard(data.results);
+            } else {
+              alert("Hata: " + (data.error || "Bilinmeyen bir hata oluştu."));
+            }
+          } catch (err) {
+            console.error(err);
+            alert("Bağlantı hatası.");
+          } finally {
+            btn.disabled = false;
+            loadingDiv.classList.add("hidden");
+          }
+        });
+
+      function renderDashboard(results) {
+        const labels = results.map((r) => r.algorithm);
+        const animate = { duration: 1000, easing: "easeOutQuart" };
+
+        // Update Chart Data
+        updateChart(
+          "costChart",
+          labels,
+          results.map((r) => r.cost),
+          "Maliyet",
+          "#2563eb"
+        );
+        updateChart(
+          "relChart",
+          labels,
+          results.map((r) => r.reliability),
+          "Güvenilirlik %",
+          "#16a34a"
+        );
+        updateChart(
+          "delayChart",
+          labels,
+          results.map((r) => r.delay),
+          "Gecikme ms",
+          "#dc2626"
+        );
+        updateChart(
+          "resChart",
+          labels,
+          results.map((r) => r.resource_cost),
+          "Kaynak Maliyeti",
+          "#f59e0b"
+        );
+
+        // Update Table
+        const tableBody = document.getElementById("pathTableBody");
+        tableBody.innerHTML = results
+          .map(
+            (r) => `
+                <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                    <td class="py-4 px-4 font-bold text-slate-700">${
+                      r.algorithm
+                    }</td>
+                    <td class="py-4 px-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                            <span class="text-xs text-slate-500">${(
+                              1 / r.cost
+                            ).toFixed(2)} score</span>
+                        </div>
+                    </td>
+                    <td class="py-4 px-4 font-mono text-xs text-slate-500">
+                        ${r.path.join(" → ")}
+                    </td>
+                </tr>
+            `
+          )
+          .join("");
+
+        document.getElementById("results").classList.remove("hidden");
+      }
+
+      function updateChart(canvasId, labels, data, title, color) {
+        const ctx = document.getElementById(canvasId).getContext("2d");
+
+        if (charts[canvasId]) charts[canvasId].destroy();
+
+        charts[canvasId] = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: title,
+                data: data,
+                backgroundColor: color + "20", // Light transparency
+                borderColor: color,
+                borderWidth: 2,
+                borderRadius: 8,
+                barThickness: 45,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, grid: { color: "#f1f5f9" } },
+              x: { grid: { display: false } },
+            },
+            animation: { duration: 1000 },
+          },
+        });
+      }
+    </script>
+  </body>
+</html>

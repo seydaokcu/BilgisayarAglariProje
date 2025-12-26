@@ -1,0 +1,107 @@
+:root {
+    /* ANA RENKLER */
+    --brand-primary: #2563eb;      /* Mavi (buton, vurgu) */
+    --brand-primary-dark: #1e40af; /* Hover / koyu mavi */
+
+    --brand-yellow: #facc15;       /* Sarı vurgu */
+    --brand-yellow-soft: #fde68a;  /* Açık sarı arka plan */
+
+    /* NÖTR RENKLER */
+    --brand-dark: #1f2937;         /* Gerçek koyu renk (text / ikon) */
+    --text-main: #111827;
+    --text-light: #6b7280;
+
+    /* SLIDER */
+    --track-bg: #e5e7eb;
+    --track-bg-focus: #d1d5db;
+
+    /* DEBUG */
+    --debug-bg: #0f172a;
+
+    /* BOYUTLANDIRMA */
+    --slider-height: 4px;
+    --thumb-size: 20px;
+}
+
+
+/* Metot: Slider Genel Sıfırlama */
+input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: var(--slider-height);
+    background: transparent; /* İz (track) zaten aşağıda tanımlı */
+}
+
+/* Metot: İz (Track) Tasarımı */
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: var(--slider-height);
+    cursor: pointer;
+    background: var(--track-bg);
+    border-radius: 999px;
+    transition: background 0.3s ease;
+}
+
+/* Metot: İz Odaklanma Etkisi */
+input[type=range]:focus::-webkit-slider-runnable-track {
+    background: var(--track-bg-focus);
+}
+
+/* Metot: Başparmak (Thumb) Tasarımı */
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: var(--thumb-size);
+    width: var(--thumb-size);
+    border-radius: 50%;
+    background: var(--brand-yellow);
+    border: 2px solid var(--brand-dark);
+    cursor: pointer;
+    /* (Thumb-size - Track-height) / 2 formülü ile tam merkezleme */
+    margin-top: calc((var(--thumb-size) / -2) + (var(--slider-height) / 2));
+}
+/* Metot: Aktif Kart Durumu */
+.algorithm-card.active {
+    border-color: var(--brand-yellow);
+    background-color: var(--brand-yellow);
+    color: var(--brand-dark);
+}
+
+/* Metot: Aktif Kart İçerik Zorlaması */
+.algorithm-card.active p {
+    color: var(--brand-dark) !important;
+}
+
+/* Metot: Aktif Kart İkon Kutusu Modu */
+.algorithm-card.active .icon-box {
+    background-color: var(--brand-dark);
+    color: var(--brand-yellow);
+}
+/* Metot: Debug Panel Tasarımı */
+#result-display {
+    background: var(--debug-bg);
+    color: var(--text-light);
+    padding: 15px;
+    border-radius: 10px;
+    font-family: 'Courier New', monospace; /* Debug için daha uygun */
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    min-height: 100px;
+}
+/* Hesapla Butonu Genel Metodu */
+.calculate-btn {
+    background-color: var(--brand-primary); /* Mavi */
+    color: #ffffff;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 999px; /* Daha modern, pill shape */
+    font-weight: 700;
+    transition: background-color 0.25s ease, transform 0.2s ease;
+    cursor: pointer;
+}
+
+.calculate-btn:hover {
+    background-color: var(--brand-primary-dark); /* Koyu mavi */
+    transform: translateY(-2px);
+}

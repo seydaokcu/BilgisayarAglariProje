@@ -1,9 +1,11 @@
 from flask import Flask, render_template, request, jsonify
 import networkx as nx
+import matplotlib
+matplotlib.use('Agg')  # Force non-interactive backend for stability
 import matplotlib.pyplot as plt
 import io
 import base64
-
+import threading
 import Ag_olusturma as ag
 
 try:
@@ -13,15 +15,17 @@ try:
 except ImportError as e:
     print(f"Algoritma modülü yüklenemedi: {e}")
 
+plot_lock = threading.Lock()
+
+# Basit In-Memory Cache (Source-Target-Alg-Params -> Result)
+RESULT_CACHE = {}
+
 # --------------------------------------------------
-# GRAF
+# GRAF VE YARDIMCI FONKSİYONLAR
 # --------------------------------------------------
 G_ORIGINAL = ag.G
 app = Flask(__name__)
 
-# --------------------------------------------------
-# YARDIMCI FONKSİYONLAR
-# --------------------------------------------------
 def safe_float(val, default):
     try:
         return float(val)
@@ -37,27 +41,27 @@ def filter_graph_by_bandwidth(G, min_bandwidth):
             Gf.remove_edge(u, v)
     return Gf
 
-
 def draw_network_to_base64(G, path=None):
-    fig, ax = plt.subplots(figsize=(10, 8))
-    pos = nx.spring_layout(G, seed=42)
+    # Lock kullanarak thread hatasını önle
+    with plot_lock:
+        fig, ax = plt.subplots(figsize=(10, 8))
+        pos = nx.spring_layout(G, seed=42)
 
-    nx.draw_networkx_nodes(G, pos, node_color="#2563eb", node_size=600, ax=ax)
-    nx.draw_networkx_labels(G, pos, font_color="white", ax=ax)
-    nx.draw_networkx_edges(G, pos, edge_color="#9ca3af", ax=ax)
+        nx.draw_networkx_nodes(G, pos, node_color="#2563eb", node_size=600, ax=ax)
+        nx.draw_networkx_labels(G, pos, font_color="white", ax=ax)
+        nx.draw_networkx_edges(G, pos, edge_color="#9ca3af", ax=ax)
 
-    if path and len(path) > 1:
-        edges = list(zip(path[:-1], path[1:]))
-        nx.draw_networkx_edges(
-            G, pos, edgelist=edges, edge_color="#facc15", width=4, ax=ax
-        )
+        if path and len(path) > 1:
+            edges = list(zip(path[:-1], path[1:]))
+            nx.draw_networkx_edges(
+                G, pos, edgelist=edges, edge_color="#facc15", width=4, ax=ax
+            )
 
-    buf = io.BytesIO()
-    plt.tight_layout()
-    plt.savefig(buf, format="png")
-    plt.close(fig)
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
-
+        buf = io.BytesIO()
+        plt.tight_layout()
+        plt.savefig(buf, format="png")
+        plt.close(fig)
+        return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 # --------------------------------------------------
 # ROUTE HESAPLAMA
@@ -76,6 +80,16 @@ def calculate_route():
         w_rel = safe_float(data.get("w_rel"), 0.33)
         w_res = safe_float(data.get("w_res"), 0.34)
 
+        # CACHE CHECK
+        # Parametreleri anahtar yap (JSON string olarak basitçe)
+        import json
+        cache_key = json.dumps(data, sort_keys=True)
+        if cache_key in RESULT_CACHE:
+            print("CACHE HIT!")
+            return jsonify(RESULT_CACHE[cache_key])
+
+        print("CACHE MISS - Calculating...")
+
         # Grafiği filtrele (bandwidth >= min_bandwidth)
         G_filtered = filter_graph_by_bandwidth(G_ORIGINAL, min_bandwidth)
 
@@ -86,7 +100,7 @@ def calculate_route():
         final_cost = None
         metrics = None
 
-        # ---------------- ALGORİTMA SEÇİMİ ----------------
+        # ---------------- ALGORİTMA SEÇİMİ (TUNED PARAMETERS) ----------------
         if algorithm == "Q-Learning":
             agent = QLearningAgent(
                 G_filtered,
@@ -94,19 +108,20 @@ def calculate_route():
                 w_reliability=w_rel,
                 w_resource=w_res
             )
-            agent.train(source, target, episodes=800)
+            # Epizot sayısı artırıldı (Kalite için 3000 -> 10000)
+            agent.train(source, target, episodes=10000)
             final_path = agent.get_best_path(source, target)
 
         elif algorithm == "ACO":
-            # run_aco global G kullanıyor, G parametresi gönderme
+            # Ants/Iter azaltıldı (Hız)
             final_path, final_cost, metrics = run_aco(
                 source,
                 target,
                 w_delay=w_delay,
                 w_rel=w_rel,
                 w_res=w_res,
-                n_ants=20,
-                n_iter=15
+                n_ants=15,  # 20 -> 15
+                n_iter=10   # 15 -> 10
             )
 
             if final_path is None:
@@ -115,12 +130,13 @@ def calculate_route():
                 }), 400
 
         elif algorithm == "GA":
+            # Pop/Gen azaltıldı (Hız)
             result = run_ga(
                 source,
                 target,
-                min_bandwidth,   # demand_bw
-                pop_size=40,
-                generations=100,
+                min_bandwidth,
+                pop_size=30,      # 40 -> 30
+                generations=40,   # 100 -> 40
                 mutation_rate=0.2,
                 max_hops=6
             )
@@ -142,16 +158,49 @@ def calculate_route():
             w_resource=w_res
         )
 
+        res_cost = ag.resource_cost(final_path, G_filtered)
+        rel_cost = ag.reliability_cost(final_path, G_filtered)
+
+        # Bottleneck & Usage
+        bw_list = [G_filtered.edges[final_path[i], final_path[i+1]]["bandwidth"] for i in range(len(final_path)-1)]
+        bottleneck = min(bw_list) if bw_list else 0
+        max_bw = max(bw_list) if bw_list else 0
+        
+        usage = 0
+        if bottleneck > 0:
+            if min_bandwidth > 0:
+                 usage = (min_bandwidth / bottleneck) * 100
+            else:
+                 # Fallback: Simulate 100 Mbps load if no demand specified (for better visibility)
+                 usage = (100 / bottleneck) * 100 
+
         # Grafik görseli base64 olarak çiz
         graph_img = draw_network_to_base64(G_filtered, final_path)
 
-        return jsonify({
+        # SONUÇ
+        response_data = {
             "path": [str(n) for n in final_path],
             "delay": f"{delay:.2f}",
             "reliability": f"{reliability:.2f}",
             "total_cost": f"{cost:.4f}",
+            "resource_cost": f"{res_cost:.4f}",
+            "reliability_cost": f"{rel_cost:.4f}",
+            "usage": usage,
+            "sim_results": {
+                "total_segments": len(final_path) - 1,
+                "path_length_hops": len(final_path) - 1,
+                "bottleneck_capacity": bottleneck,
+                "max_capacity": max_bw,
+                "reliability_cost": rel_cost
+            },
+            "debug": f"Algorithm: {algorithm}, Cost: {cost:.4f}",
             "graph_image": graph_img
-        })
+        }
+
+        # Cache'e kaydet
+        RESULT_CACHE[cache_key] = response_data
+
+        return jsonify(response_data)
 
     except Exception as e:
         import traceback
@@ -168,6 +217,65 @@ def index():
     graph_img = draw_network_to_base64(G_ORIGINAL)
     return render_template("index.html", initial_graph=graph_img)
 
+@app.route("/get_initial_graph")
+def get_initial_graph():
+    return jsonify({})
+
+@app.route("/compare")
+def compare():
+    return render_template("compare.html")
+
+@app.route("/api/compare_all", methods=["POST"])
+def api_compare_all():
+    try:
+        data = request.get_json()
+        source = int(data.get("source"))
+        target = int(data.get("target"))
+        min_bandwidth = safe_float(data.get("min_bandwidth"), 0)
+        w_delay = safe_float(data.get("w_delay"), 0.33)
+        w_rel = safe_float(data.get("w_rel"), 0.33)
+        w_res = safe_float(data.get("w_res"), 0.34)
+
+        G_filtered = filter_graph_by_bandwidth(G_ORIGINAL, min_bandwidth)
+        
+        results = []
+        algorithms = ["Q-Learning", "ACO", "GA"]
+
+        for alg in algorithms:
+            final_path = None
+            
+            if alg == "Q-Learning":
+                agent = QLearningAgent(G_filtered, w_delay=w_delay, w_reliability=w_rel, w_resource=w_res)
+                agent.train(source, target, episodes=10000)
+                final_path = agent.get_best_path(source, target)
+            
+            elif alg == "ACO":
+                final_path, _, _ = run_aco(source, target, w_delay=w_delay, w_rel=w_rel, w_res=w_res, n_ants=15, n_iter=10)
+            
+            elif alg == "GA":
+                ga_res = run_ga(source, target, min_bandwidth, pop_size=30, generations=40)
+                final_path = ga_res["best_path"]
+
+            if final_path:
+                delay = ag.total_delay(final_path, G_filtered)
+                reliability = ag.total_reliability(final_path, G_filtered) * 100
+                cost = ag.weighted_sum_method(final_path, G_filtered, w_delay=w_delay, w_reliability=w_rel, w_resource=w_res)
+                res_cost = ag.resource_cost(final_path, G_filtered)
+                
+                results.append({
+                    "algorithm": alg,
+                    "delay": round(delay, 2),
+                    "reliability": round(reliability, 2),
+                    "cost": round(cost, 4),
+                    "resource_cost": round(res_cost, 4),
+                    "path": [str(n) for n in final_path]
+                })
+
+        return jsonify({"results": results})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "detail": traceback.format_exc()}), 500
 
 # --------------------------------------------------
 if __name__ == "__main__":
