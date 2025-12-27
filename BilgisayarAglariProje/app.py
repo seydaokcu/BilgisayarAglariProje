@@ -44,22 +44,69 @@ def filter_graph_by_bandwidth(G, min_bandwidth):
 def draw_network_to_base64(G, path=None):
     # Lock kullanarak thread hatasını önle
     with plot_lock:
-        fig, ax = plt.subplots(figsize=(10, 8))
-        pos = nx.spring_layout(G, seed=42)
+        fig, ax = plt.subplots(figsize=(12, 10), dpi=100)
+        ax.set_facecolor('#ffffff')
+        
+        # Daha düzenli bir layout için k spring_layout parametrelerini ayarla
+        pos = nx.spring_layout(G, seed=42, k=0.15, iterations=50)
 
-        nx.draw_networkx_nodes(G, pos, node_color="#2563eb", node_size=600, ax=ax)
-        nx.draw_networkx_labels(G, pos, font_color="white", ax=ax)
-        nx.draw_networkx_edges(G, pos, edge_color="#9ca3af", ax=ax)
+        # 1. TÜM KENARLAR (Arka Plan)
+        nx.draw_networkx_edges(
+            G, pos, 
+            edge_color="#e2e8f0", 
+            width=0.5, 
+            alpha=0.5, 
+            ax=ax, 
+            arrows=False
+        )
+
+        # 2. TÜM DÜĞÜMLER (Arka Plan)
+        nx.draw_networkx_nodes(
+            G, pos, 
+            node_color="#94a3b8", 
+            node_size=150, 
+            ax=ax, 
+            alpha=0.8
+        )
 
         if path and len(path) > 1:
             edges = list(zip(path[:-1], path[1:]))
+            source_node = path[0]
+            target_node = path[-1]
+            path_nodes = set(path)
+
+            # 3. YOL KENARLARI (Vurgulu)
             nx.draw_networkx_edges(
-                G, pos, edgelist=edges, edge_color="#facc15", width=4, ax=ax
+                G, pos, 
+                edgelist=edges, 
+                edge_color="#ef4444", # RED
+                width=4.0,            # Thinner
+                ax=ax, 
+                arrows=True,
+                arrowsize=20
             )
 
+            # 4. YOL DÜĞÜMLERİ
+            nx.draw_networkx_nodes(
+                G, pos, 
+                nodelist=list(path_nodes - {source_node, target_node}),
+                node_color="#f59e0b", # Yellowish-Orangish (Amber)
+                node_size=600, 
+                ax=ax
+            )
+
+            # 5. KAYNAK VE HEDEF (Turuncu)
+            nx.draw_networkx_nodes(G, pos, nodelist=[source_node], node_color="#f59e0b", node_size=1000, ax=ax)
+            nx.draw_networkx_nodes(G, pos, nodelist=[target_node], node_color="#f59e0b", node_size=1000, ax=ax)
+            
+            # Etiketler (Sadece yol üzerindekiler için)
+            labels = {n: str(n) for n in path}
+            nx.draw_networkx_labels(G, pos, labels=labels, font_size=12, font_weight="bold", font_color="white", ax=ax)
+
+        plt.axis('off')
         buf = io.BytesIO()
         plt.tight_layout()
-        plt.savefig(buf, format="png")
+        plt.savefig(buf, format="png", bbox_inches='tight', pad_inches=0.1)
         plt.close(fig)
         return base64.b64encode(buf.getvalue()).decode("utf-8")
 

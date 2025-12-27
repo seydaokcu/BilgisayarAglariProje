@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const delayVal = document.getElementById("delay-val");
   const usageVal = document.getElementById("usage-val");
   const resultDisplay = document.getElementById("result-display");
+  const networkGraph = document.getElementById("network-graph");
   const graphPlaceholder = document.getElementById("graph-placeholder");
   const metricsBreakdown = document.getElementById("metrics-breakdown");
 
@@ -165,7 +166,9 @@ document.addEventListener("DOMContentLoaded", () => {
       algorithm: selectedAlgInput.value,
       source: document.getElementById("source").value,
       target: document.getElementById("target").value,
-      min_bandwidth: parseFloat(document.getElementById("min_bandwidth").value),
+      min_bandwidth: document.getElementById("min_bandwidth")
+        ? parseFloat(document.getElementById("min_bandwidth").value)
+        : 0,
       w_rel: document.getElementById("w_rel").value,
       w_delay: document.getElementById("w_delay").value,
       w_res: document.getElementById("w_res").value,
@@ -197,11 +200,18 @@ document.addEventListener("DOMContentLoaded", () => {
           })
           .join("");
 
-        // RENDER GRAPH
-        if (result.graph_data) {
-          initCy(result.graph_data);
+        // RENDER GRAPH (Matplotlib Image Update)
+        if (result.graph_image) {
+          if (networkGraph) {
+            networkGraph.src = `data:image/png;base64,${result.graph_image}`;
+            networkGraph.classList.remove("hidden");
+          }
+          if (graphPlaceholder) graphPlaceholder.classList.add("hidden");
+
+          const cyContainer = document.getElementById("cy-container");
+          if (cyContainer) cyContainer.classList.add("hidden");
         } else {
-          console.error("Graf verisi dönmedi!");
+          console.error("Graf görseli dönmedi!");
         }
 
         resultDisplay.textContent = result.debug;
