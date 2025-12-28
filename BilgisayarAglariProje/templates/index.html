@@ -153,6 +153,24 @@
                             location_on
                         </span>
                     </div>
+
+                    <!-- ✅ YENİ: Bandwidth (Min. Mbps) -->
+                    <div class="flex flex-col gap-2 relative">
+                        <label for="min_bandwidth" class="text-sm font-medium text-text-sub">Bandwidth (Min. Mbps)</label>
+                        <input 
+                            id="min_bandwidth" 
+                            name="min_bandwidth" 
+                            type="number" 
+                            value="0" 
+                            min="0"
+                            step="1"
+                            placeholder="Örn: 50"
+                            class="w-full pl-10 pr-4 py-3 rounded-md border border-gray-300 bg-white text-text-main font-medium focus:ring-primary focus:border-primary"
+                        />
+                        <span class="material-symbols-outlined absolute left-3 top-10 text-xl text-text-sub">
+                            speed
+                        </span>
+                    </div>
                     
                         
                         

@@ -20,6 +20,45 @@ def path_min_bandwidth(path, G):
     return m
 
 
+# ------------------------------------------------
+# Ağırlıkları doğrula + (opsiyonel) normalize et
+# ------------------------------------------------
+def prepare_weights(w_delay, w_reliability, w_resource, normalize=True):
+    try:
+        w_delay = float(w_delay)
+        w_reliability = float(w_reliability)
+        w_resource = float(w_resource)
+    except (TypeError, ValueError):
+        raise ValueError("Ağırlıklar sayısal olmalıdır (w_delay, w_reliability, w_resource).")
+
+    if w_delay < 0 or w_reliability < 0 or w_resource < 0:
+        raise ValueError("Ağırlıklar negatif olamaz.")
+
+    s = w_delay + w_reliability + w_resource
+    if s == 0:
+        raise ValueError("Ağırlıkların toplamı 0 olamaz. En az bir ağırlık > 0 olmalı.")
+
+    if normalize:
+        w_delay /= s
+        w_reliability /= s
+        w_resource /= s
+
+    return w_delay, w_reliability, w_resource
+
+
+# ------------------------------------------------
+# Toplam maliyeti ağırlıklarla hesaplayan yardımcı fonksiyon
+# (weighted_sum_method Ag_olusturma.py içinden geliyor)
+# ------------------------------------------------
+def cost_with_weights(path, G, w_delay, w_reliability, w_resource):
+    return weighted_sum_method(
+        path, G,
+        w_delay=w_delay,
+        w_reliability=w_reliability,
+        w_resource=w_resource
+    )
+
+
 # ---------------------------------------------
 # Rastgele yol üretme
 # (Basit random walk; hedefe ulaşırsa döner)
@@ -63,26 +102,26 @@ def create_population(size, source, target, G, demand_bw, max_hops=6):
 
 
 # ---------------------------------------------
-# Fitness (bandwidth kısıtı dahil)
+# Fitness (bandwidth kısıtı + kullanıcı ağırlıkları dahil)
 # ---------------------------------------------
-def fitness(path, G, demand_bw):
+def fitness(path, G, demand_bw, w_delay, w_reliability, w_resource):
     if path is None:
         return 0
 
     if not is_valid_path(path, G, min_bandwidth=demand_bw):
         return 0
 
-    cost = weighted_sum_method(path, G)
+    cost = cost_with_weights(path, G, w_delay, w_reliability, w_resource)
     return 1 / (1 + cost)
 
 
 # ---------------------------------------------
 # Tournament Selection
 # ---------------------------------------------
-def tournament_selection(population, G, demand_bw, k=3):
+def tournament_selection(population, G, demand_bw, w_delay, w_reliability, w_resource, k=3):
     k = min(k, len(population))
     candidates = random.sample(population, k)
-    return max(candidates, key=lambda p: fitness(p, G, demand_bw))
+    return max(candidates, key=lambda p: fitness(p, G, demand_bw, w_delay, w_reliability, w_resource))
 
 
 # ---------------------------------------------
@@ -126,9 +165,10 @@ def mutate(path, G, rate=0.2):
 
 
 # ---------------------------------------------
-# GENETİK ALGORİTMA (demand_bw eklendi)
+# GENETİK ALGORİTMA (demand_bw + ağırlıklar eklendi)
 # ---------------------------------------------
 def genetic_algorithm(source, target, G, demand_bw,
+                      w_delay, w_reliability, w_resource,
                       pop_size=40,
                       generations=100,
                       mutation_rate=0.2,
@@ -151,8 +191,8 @@ def genetic_algorithm(source, target, G, demand_bw,
         while len(new_pop) < pop_size and tries < max_tries:
             tries += 1
 
-            p1 = tournament_selection(population, G, demand_bw)
-            p2 = tournament_selection(population, G, demand_bw)
+            p1 = tournament_selection(population, G, demand_bw, w_delay, w_reliability, w_resource)
+            p2 = tournament_selection(population, G, demand_bw, w_delay, w_reliability, w_resource)
 
             child = crossover(p1, p2, G)
             child = mutate(child, G, mutation_rate)
@@ -166,7 +206,7 @@ def genetic_algorithm(source, target, G, demand_bw,
         population = new_pop
 
         for path in population:
-            f = fitness(path, G, demand_bw)
+            f = fitness(path, G, demand_bw, w_delay, w_reliability, w_resource)
             if f > best_fit:
                 best_fit = f
                 best_path = path
@@ -178,18 +218,39 @@ def genetic_algorithm(source, target, G, demand_bw,
 
 # ---------------------------------------------
 # ARAYÜZCÜNÜN KULLANACAĞI FONKSİYON
+# Kullanıcı ağırlıkları buradan verilir
 # ---------------------------------------------
 def run_ga(source, target, demand_bw,
+           w_delay=0.33, w_reliability=0.33, w_resource=0.34,
+           normalize_weights=True,
            pop_size=40,
            generations=100,
            mutation_rate=0.2,
            max_hops=6):
+
+    # Demand doğrulama
+    try:
+        demand_bw = float(demand_bw)
+    except (TypeError, ValueError):
+        return {"best_path": None, "fitness": 0, "error": "Demand (Mbps) sayısal olmalıdır."}
+
+    if demand_bw < 0:
+        return {"best_path": None, "fitness": 0, "error": "Demand negatif olamaz."}
+
+    # Ağırlıkları hazırla
+    try:
+        w_delay, w_reliability, w_resource = prepare_weights(
+            w_delay, w_reliability, w_resource, normalize=normalize_weights
+        )
+    except ValueError as e:
+        return {"best_path": None, "fitness": 0, "error": str(e)}
 
     best_path, best_fit = genetic_algorithm(
         source,
         target,
         G,
         demand_bw,
+        w_delay, w_reliability, w_resource,
         pop_size,
         generations,
         mutation_rate,
@@ -200,12 +261,13 @@ def run_ga(source, target, demand_bw,
         return {
             "best_path": None,
             "fitness": 0,
-            "error": f"Uygun bandwidth sağlayan yol bulunamadı (demand={demand_bw} Mbps)."
+            "error": f"Uygun bandwidth sağlayan yol bulunamadı (demand={demand_bw} Mbps).",
+            "weights": {"w_delay": w_delay, "w_reliability": w_reliability, "w_resource": w_resource}
         }
 
     delay = total_delay(best_path, G)
     reliability = total_reliability(best_path, G)
-    cost = weighted_sum_method(best_path, G)
+    cost = cost_with_weights(best_path, G, w_delay, w_reliability, w_resource)
     min_bw = path_min_bandwidth(best_path, G)
 
     return {
@@ -214,7 +276,8 @@ def run_ga(source, target, demand_bw,
         "delay": delay,
         "reliability": reliability,
         "cost": cost,
-        "min_bw": min_bw
+        "min_bw": min_bw,
+        "weights": {"w_delay": w_delay, "w_reliability": w_reliability, "w_resource": w_resource}
     }
 
 
@@ -226,12 +289,22 @@ if __name__ == "__main__":
     target = 44
     demand_bw = 800  # kullanıcı talebi (Mbps)
 
-    result = run_ga(source, target, demand_bw)
+    # Kullanıcı ağırlıkları (örnek)
+    w_delay = 0.50
+    w_reliability = 0.20
+    w_resource = 0.30
+
+    result = run_ga(
+        source, target, demand_bw,
+        w_delay=w_delay, w_reliability=w_reliability, w_resource=w_resource,
+        normalize_weights=True
+    )
 
     print("\n=== SONUÇLAR ===")
     if result.get("best_path") is None:
         print("HATA:", result.get("error"))
         print("Demand:", demand_bw)
+        print("Weights:", result.get("weights"))
     else:
         print("En iyi yol:", result["best_path"])
         print("Fitness:", result["fitness"])
@@ -239,8 +312,9 @@ if __name__ == "__main__":
         print("Toplam güvenilirlik:", result["reliability"])
         print("Toplam cost:", result["cost"])
         print("Yol min bandwidth (bottleneck):", result["min_bw"])
+        print("Weights:", result["weights"])
 
-        # ✅ Net kontrol (hatasız)
+        # ✅ Net kontrol
         print("Demand:", demand_bw)
         print("Min BW:", result["min_bw"])
         print("Kısıt sağlandı mı?:", result["min_bw"] >= demand_bw)

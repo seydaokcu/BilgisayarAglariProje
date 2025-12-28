@@ -8,6 +8,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectedAlgInput = document.getElementById("selected-algorithm-input");
   const outputAlgDisplay = document.getElementById("output-alg");
 
+  // ✅ YENİ: Bandwidth input (index.html'e eklediğin alan)
+  const minBandwidthInput = document.getElementById("min_bandwidth");
+
   // Sonuç Ekranları
   const totalCostDisplay = document.getElementById("total-cost-display");
   const pathDisplay = document.getElementById("path-display");
@@ -162,13 +165,21 @@ document.addEventListener("DOMContentLoaded", () => {
     calcBtn.innerHTML =
       '<span class="material-symbols-outlined animate-spin">progress_activity</span> Hesaplama Yapılıyor...';
 
+    // ✅ YENİ: Bandwidth değerini güvenli al (NaN -> 0)
+    let minBw = 0;
+    if (minBandwidthInput) {
+      const parsed = parseFloat(minBandwidthInput.value);
+      minBw = Number.isFinite(parsed) ? parsed : 0;
+    }
+
     const data = {
       algorithm: selectedAlgInput.value,
       source: document.getElementById("source").value,
       target: document.getElementById("target").value,
-      min_bandwidth: document.getElementById("min_bandwidth")
-        ? parseFloat(document.getElementById("min_bandwidth").value)
-        : 0,
+
+      // ✅ Bandwidth artık anasayfadan da giriliyor
+      min_bandwidth: minBw,
+
       w_rel: document.getElementById("w_rel").value,
       w_delay: document.getElementById("w_delay").value,
       w_res: document.getElementById("w_res").value,
@@ -220,8 +231,11 @@ document.addEventListener("DOMContentLoaded", () => {
         totalCostDisplay.textContent = "--.--";
         pathDisplay.textContent = errorMessage;
         resultDisplay.textContent = `HATA: ${errorMessage}`;
-        // Grafiği gizlemiyoruz, eski graf kalsın veya boşaltalım?
-        // cy.destroy() yapabiliriz ama hata durumunda eskiyi görmek iyidir.
+
+        // ✅ YENİ: Hata olunca metrikleri de sıfırla / placeholder yap
+        relVal.textContent = "--%";
+        delayVal.textContent = "--ms";
+        usageVal.textContent = "--%";
       }
     } catch (error) {
       resultDisplay.textContent = `BAĞLANTI HATASI: ${error.message}`;
