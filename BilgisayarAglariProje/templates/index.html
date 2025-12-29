@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QoS Routing Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Özelleştirilmiş Renkler (AÇIK TEMA) */
+        :root {
+            --primary: #2563eb;     /* Amber-600: Buton ve vurgu rengi */
+            --primary-light: #60a5fa; /* Amber-300 */
+            --background: #ffffff;  /* Ana arka plan (Beyaz) */
+            --background-light: #f9fafb; /* Açık Gri */
+            --surface: #ffffff;     /* Kartlar için yüzey */
+            --text-main: #1f2937;   /* Koyu Gri/Mavi (Ana metin) */
+            --text-sub: #6b7280;    /* Orta Gri (Alt metin) */
+            --border-color: #e5e7eb; /* Sınır rengi */
+        }
+
+        /* Ana Tema Ayarları */
+        body {
+            background-color: var(--background);
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+
+        /* Algoritma Kartı Stili */
+        .algorithm-card {
+            border-color: var(--border-color);
+            background-color: var(--surface);
+        }
+        .algorithm-card.active {
+            border-color: var(--primary);
+            background-color: var(--primary);
+            color: var(--text-main); /* Aktif kartta metin koyu olsun */
+        }
+        .algorithm-card.active .icon-box {
+            background-color: var(--text-main); /* Aktif kartta ikon kutusu koyu olsun */
+            color: var(--primary);
+        }
+        .algorithm-card.active .text-text-sub {
+            color: rgba(31, 41, 55, 0.7); /* Açık renkte alt metin */
+        }
+        .algorithm-card:not(.active):hover {
+            background-color: var(--background-light);
+        }
+        /* Range Slider'ı Açık Temaya Uyarlama */
+        input[type=range]::-webkit-slider-thumb {
+            background: var(--primary);
+        }
+        input[type=range]::-moz-range-thumb {
+            background: var(--primary);
+        }
+
+        /* Yükleniyor animasyonu */
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+    </style>
+</head>
+<body>
+<div class="flex flex-col min-h-screen">
+
+    <header class="py-8 text-center border-b border-gray-200">
+        <h1 class="text-4xl font-extrabold tracking-tight">QoS Routing Simulator</h1>
+    </header>
+
+    <main class="flex-1 px-4 md:px-10 py-8 max-w-7xl mx-auto w-full">
+        <form id="qos-form" class="grid grid-cols-1 lg:grid-cols-12 gap-8" method="POST">
+            
+            <div class="lg:col-span-7 flex flex-col gap-8">
+                
+                <section class="metric-section rounded-xl p-6 shadow-lg border border-gray-200">
+                    <h3 class="text-xl font-bold flex items-center gap-3 mb-6 text-text-main">
+                        <span class="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm">1</span>
+                        Algoritma Seçimi
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="algorithm-card active cursor-pointer p-5 rounded-lg border-2 border-solid transition-all duration-300" data-alg="Q-Learning">
+                            <div class="flex items-center gap-3">
+                                <div class="icon-box size-8 flex items-center justify-center rounded-full bg-black text-white">
+                                    <span class="material-symbols-outlined text-xl">cognition</span>
+                                </div>
+                                <h4 class="font-bold text-lg text-text-main">Q-Learning</h4>
+                            </div>
+                            <p class="text-xs text-text-sub mt-2">Pekiştirmeli Öğrenme ile adaptif rota.</p>
+                        </div>
+                        <div class="algorithm-card cursor-pointer p-5 rounded-lg border-2 border-solid transition-all duration-300" data-alg="ACO">
+                            <div class="flex items-center gap-3">
+                                <div class="icon-box size-8 flex items-center justify-center rounded-full bg-black text-white">
+                                    <span class="material-symbols-outlined text-xl">hive</span>
+                                </div>
+                                <h4 class="font-bold text-lg text-text-main">ACO</h4>
+                            </div>
+                            <p class="text-xs text-text-sub mt-2">Karınca Kolonisi Optimizasyonu.</p>
+                        </div>
+                        <div class="algorithm-card cursor-pointer p-5 rounded-lg border-2 border-solid transition-all duration-300" data-alg="GA">
+                            <div class="flex items-center gap-3">
+                                <div class="icon-box size-8 flex items-center justify-center rounded-full bg-black text-white">
+                                    <span class="material-symbols-outlined text-xl">G</span> 
+                                </div>
+                                <h4 class="font-bold text-lg text-text-main">Genetic</h4>
+                            </div>
+                            <p class="text-xs text-text-sub mt-2">Genetik Algoritma tabanlı optimizasyon.</p>
+                        </div>
+                        
+                        <input type="hidden" id="selected-algorithm-input" name="algorithm" value="Q-Learning">
+                    </div>
+                </section>
+                
+                <section class="bg-surface rounded-xl p-6 shadow-lg border border-gray-200">
+                    <h3 class="text-xl font-bold flex items-center gap-3 mb-6 text-text-main">
+                        <span class="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm">2</span>
+                        Ağ Parametreleri (Düğümler)
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+                        <!-- Kaynak (S) -->
+                        <div class="flex flex-col gap-2 relative">
+                            <label class="text-sm font-medium text-text-sub">Kaynak (S)</label>
+                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-xl text-text-sub">
+                                arrow_right_alt
+                            </span>
+                            <input 
+                                id="source" 
+                                name="source" 
+                                type="number" 
+                                value="0" 
+                                min="0"
+                                class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 bg-white text-text-main font-medium focus:ring-primary focus:border-primary"
+                            />
+                        </div>
+                    
+                    <div class="flex flex-col gap-2 relative">
+                        <label for="target" class="text-sm font-medium text-text-sub">Hedef (D)</label>
+                        <input 
+                            id="target" 
+                            name="target" 
+                            type="number" 
+                            value="0" 
+                            min="0"
+                            class="w-full pl-10 pr-4 py-3 rounded-md border border-gray-300 bg-white text-text-main font-medium focus:ring-primary focus:border-primary"
+                        />
+                        <span class="material-symbols-outlined absolute left-3 top-10 text-xl text-text-sub">
+                            location_on
+                        </span>
+                    </div>
+
+                    <!-- ✅ YENİ: Bandwidth (Min. Mbps) -->
+                    <div class="flex flex-col gap-2 relative">
+                        <label for="min_bandwidth" class="text-sm font-medium text-text-sub">Bandwidth (Min. Mbps)</label>
+                        <input 
+                            id="min_bandwidth" 
+                            name="min_bandwidth" 
+                            type="number" 
+                            value="0" 
+                            min="0"
+                            step="1"
+                            placeholder="Örn: 50"
+                            class="w-full pl-10 pr-4 py-3 rounded-md border border-gray-300 bg-white text-text-main font-medium focus:ring-primary focus:border-primary"
+                        />
+                        <span class="material-symbols-outlined absolute left-3 top-10 text-xl text-text-sub">
+                            speed
+                        </span>
+                    </div>
+                    
+                        
+                        
+                </section>
+
+                <section class="metric-section rounded-xl p-6 shadow-lg border border-gray-200">
+                    <h3 class="text-xl font-bold flex items-center gap-3 mb-6 text-text-main">
+                        <span class="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm">3</span>
+                        Metrik Ağırlıkları (W)
+                    </h3>
+                
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                        <!-- W_RELIABILITY -->
+                        <div>
+                            <label class="text-sm font-medium block mb-2 text-text-main">
+                                W_Güvenilirlik (Reliability)
+                            </label>
+                
+                            <div class="flex items-center gap-3">
+                                <input
+                                    id="w_rel"
+                                    name="w_rel"
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value="0.33"
+                                    class="flex-1"
+                                >
+                
+                                <input
+                                    id="w_rel_number"
+                                    type="number"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value="0.33"
+                                    class="w-20 px-2 py-1 rounded-md border border-gray-300 bg-white text-sm text-center focus:ring-primary focus:border-primary"
+                                >
+                            </div>
+                        </div>
+                
+                        <!-- W_DELAY -->
+                        <div>
+                            <label class="text-sm font-medium block mb-2 text-text-main">
+                                W_Gecikme (Delay)
+                            </label>
+                
+                            <div class="flex items-center gap-3">
+                                <input
+                                    id="w_delay"
+                                    name="w_delay"
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value="0.34"
+                                    class="flex-1"
+                                >
+                
+                                <input
+                                    id="w_delay_number"
+                                    type="number"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value="0.34"
+                                    class="w-20 px-2 py-1 rounded-md border border-gray-300 bg-white text-sm text-center focus:ring-primary focus:border-primary"
+                                >
+                            </div>
+                        </div>
+                
+                        <!-- W_RESOURCE -->
+                        <div>
+                            <label class="text-sm font-medium block mb-2 text-text-main">
+                                W_Kaynak (Resource)
+                            </label>
+                
+                            <div class="flex items-center gap-3">
+                                <input
+                                    id="w_res"
+                                    name="w_res"
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value="0.33"
+                                    class="flex-1"
+                                >
+                
+                                <input
+                                    id="w_res_number"
+                                    type="number"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value="0.33"
+                                    class="w-20 px-2 py-1 rounded-md border border-gray-300 bg-white text-sm text-center focus:ring-primary focus:border-primary"
+                                >
+                            </div>
+                        </div>
+                
+                    </div>
+                </section>
+                
+
+                
+                <div class="flex gap-4">
+                    <button id="calcBtn" type="button" class="calculate-btn flex-1 py-4 rounded-full font-bold text-lg shadow-lg transition-all duration-300 flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined">play_circle</span>
+                        Hesapla
+                    </button>
+                    
+                    <a href="/compare" class="flex-none bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-6 py-4 rounded-full shadow-md transition-all flex items-center justify-center gap-2 border border-slate-200">
+                        <span class="material-symbols-outlined">compare_arrows</span>
+                        Algoritmaları Karşılaştır
+                    </a>
+                </div>
+            </div>
+            
+            <div class="lg:col-span-5 flex flex-col gap-8 sticky top-8 h-full">
+
+                <section class="bg-surface rounded-xl p-6 shadow-lg border border-gray-200">
+                    <h3 class="text-xl font-bold flex items-center gap-3 mb-4 text-text-main">
+                        <span class="material-symbols-outlined text-primary">analytics</span> 
+                        Simülasyon Sonuçları (<span id="output-alg">Q-Learning</span>)
+                    </h3>
+                    
+                    <div class="h-[350px] bg-background-light rounded-lg flex items-center justify-center relative overflow-hidden border border-gray-300">
+                        <img id="network-graph" src="data:image/png;base64,{{ initial_graph }}" alt="Network Graph" class="w-full h-full object-contain p-2">
+                        <div id="graph-placeholder" class="absolute inset-0 flex items-center justify-center text-text-sub hidden">
+                            <span class="text-lg">Hesaplama sonucu ağ görseli burada belirecektir.</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <h4 class="text-sm font-bold text-text-sub uppercase tracking-wide mb-2">BULUNAN YOL</h4>
+                        <div id="path-display" class="bg-background-light p-3 rounded-lg text-sm text-text-main font-mono overflow-x-auto whitespace-nowrap border border-gray-300">
+                            Lütfen Kaynak ve Hedef Düğümü girerek hesaplama yapınız.
+                        </div>
+                    </div>
+                </section>
+                
+                <section class="bg-surface rounded-xl p-6 shadow-lg border border-gray-200">
+                    <h3 class="text-xl font-bold mb-4 text-text-main">Metrik Dağılımı</h3>
+                    
+                    <div class="mb-4">
+                        <p class="text-lg font-medium text-text-sub">Toplam Ağırlıklı Maliyet (Hedef)</p>
+                        <p id="total-cost-display" class="text-5xl font-extrabold text-primary mt-1">--.--</p>
+                    </div>
+
+                    <div id="metrics-breakdown" class="space-y-4">
+                        <div class="flex justify-between items-center border-b border-gray-200 pb-2">
+                            <span class="font-medium text-text-main">Güvenilirlik</span>
+                            <span id="rel-val" class="font-bold text-lg text-green-600">--%</span>
+                        </div>
+                        <div class="flex justify-between items-center border-b border-gray-200 pb-2">
+                            <span class="font-medium text-text-main">Gecikme</span>
+                            <span id="delay-val" class="font-bold text-lg text-red-600">--ms</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-text-main">Kaynak Kullanımı</span>
+                            <span id="usage-val" class="font-bold text-lg text-blue-600">--%</span>
+                        </div>
+                    </div>
+
+                    </section>
+                
+                <section class="bg-surface rounded-xl p-6 shadow-lg border border-gray-200">
+                    <h3 class="text-xl font-bold mb-4 text-text-main">Debug Çıktısı</h3>
+                    <pre id="result-display" class="bg-background-light text-xs p-3 rounded-lg text-text-sub overflow-auto h-32 border border-gray-300">Sunucu yanıtları ve hata mesajları burada gösterilecektir.</pre>
+                </section>
+            </div>
+        </form>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            function syncRangeAndNumber(rangeId, numberId) {
+                const range = document.getElementById(rangeId);
+                const number = document.getElementById(numberId);
+        
+                if (!range || !number) return;
+        
+                // Slider hareket ettiğinde number input güncellenir
+                range.addEventListener('input', () => {
+                    number.value = parseFloat(range.value).toFixed(2);
+                });
+        
+                // Number input değişirse slider güncellenir
+                number.addEventListener('input', () => {
+                    let val = parseFloat(number.value);
+                    if (isNaN(val)) return;
+                    val = Math.min(1, Math.max(0, val)); // 0-1 aralığı
+                    number.value = val.toFixed(2);
+                    range.value = val;
+                });
+            }
+        
+            // Güvenilirlik, Gecikme, Kaynak slider ve number inputları eşitle
+            syncRangeAndNumber('w_rel', 'w_rel_number');
+            syncRangeAndNumber('w_delay', 'w_delay_number');
+            syncRangeAndNumber('w_res', 'w_res_number');
+        });
+        </script>
+        
+
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

@@ -188,12 +188,12 @@ def ACO(G, S, D,
 # ACO algoritmasını çalıştırır ve sonuçları ekrana yazdırır.
 
 
-def run_aco(S, D,
+def run_aco(G_in, S, D,
             w_delay=0.33, w_rel=0.33, w_res=0.34,
             n_ants=20, n_iter=15):
 
     best_path, best_cost, metrics = ACO(
-        G, S, D,
+        G_in, S, D,
         w_delay=w_delay,
         w_rel=w_rel,
         w_res=w_res,
