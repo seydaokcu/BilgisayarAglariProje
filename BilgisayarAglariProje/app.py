@@ -17,9 +17,6 @@ except ImportError as e:
 
 plot_lock = threading.Lock()
 
-# Basit In-Memory Cache (Source-Target-Alg-Params -> Result)
-RESULT_CACHE = {}
-
 # --------------------------------------------------
 # GRAF VE YARDIMCI FONKSİYONLAR
 # --------------------------------------------------
@@ -127,15 +124,7 @@ def calculate_route():
         w_rel = safe_float(data.get("w_rel"), 0.33)
         w_res = safe_float(data.get("w_res"), 0.34)
 
-        # CACHE CHECK
-        # Parametreleri anahtar yap (JSON string olarak basitçe)
-        import json
-        cache_key = json.dumps(data, sort_keys=True)
-        if cache_key in RESULT_CACHE:
-            print("CACHE HIT!")
-            return jsonify(RESULT_CACHE[cache_key])
-
-        print("CACHE MISS - Calculating...")
+        print("Calculating route...")
 
         # Grafiği filtrele (bandwidth >= min_bandwidth)
         G_filtered = filter_graph_by_bandwidth(G_ORIGINAL, min_bandwidth)
@@ -244,9 +233,6 @@ def calculate_route():
             "debug": f"Algorithm: {algorithm}, Cost: {cost:.4f}",
             "graph_image": graph_img
         }
-
-        # Cache'e kaydet
-        RESULT_CACHE[cache_key] = response_data
 
         return jsonify(response_data)
 
