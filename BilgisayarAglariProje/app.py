@@ -298,7 +298,7 @@ def api_compare_all():
                 final_path = agent.get_best_path(source, target)
             
             elif alg == "ACO":
-                final_path, _, _ = run_aco(G_filtered, source, target, w_delay=w_delay, w_rel=w_rel, w_res=w_res, n_ants=15, n_iter=10)
+                final_path, _, _ = run_aco(G_filtered, source, target, w_delay=w_delay, w_rel=w_rel, w_res=w_res, n_ants=20, n_iter=15)
             
             elif alg == "GA":
                 ga_res = run_ga(source, target, min_bandwidth, pop_size=30, generations=40)
