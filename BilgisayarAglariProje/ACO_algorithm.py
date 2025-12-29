@@ -24,13 +24,13 @@ from Ag_olusturma import (
 # Tüm yolun toplam maliyeti DEĞİLDİR.
 # ACO'nun heuristic (sezgisel bilgi) hesabında kullanılır.
 
-def compute_edge_cost(G, u, v):
+def compute_edge_cost(G, u, v, w_delay, w_rel, w_res):
     delay = G.edges[u, v]['link_delay']
     bw = G.edges[u, v]['bandwidth']
     rel = G.edges[u, v]['link_reliability']
 
-    # Smaller = better
-    return delay + (1000 / bw) - math.log(rel)
+    # Local cost based on user weights
+    return (w_delay * delay) + (w_res * (1000 / bw)) + (w_rel * -math.log(rel))
 
 
 # Graf üzerindeki tüm kenarlar için başlangıç feromon değerini oluşturur.
@@ -53,7 +53,7 @@ def initialize_pheromones(G, initial=0.1):
 # Ziyaret edilen düğümlere tekrar dönmemek için 'visited' listesi kontrol edilir.
 # Bu fonksiyon ACO’nun çekirdeğidir: arama ve keşif burada gerçekleşir.
 
-def choose_next_node(G, pheromone, current, visited, alpha=1.0, beta=2.0):
+def choose_next_node(G, pheromone, current, visited, heuristic_map, alpha=1.0, beta=2.0):
     neighbors = list(G.neighbors(current))
     candidates = []
 
@@ -62,7 +62,7 @@ def choose_next_node(G, pheromone, current, visited, alpha=1.0, beta=2.0):
             continue  # Prevent cycles
 
         tau = pheromone[(current, v)]
-        eta = 1.0 / compute_edge_cost(G, current, v)
+        eta = heuristic_map[(current, v)]
 
         candidates.append((v, (tau ** alpha) * (eta ** beta)))
 
@@ -71,8 +71,10 @@ def choose_next_node(G, pheromone, current, visited, alpha=1.0, beta=2.0):
 
     nodes, weights = zip(*candidates)
     total_w = sum(weights)
+    if total_w == 0:
+        return random.choice(nodes)
+        
     probs = [w / total_w for w in weights]
-
     return random.choices(nodes, probs)[0]
 
 
@@ -82,14 +84,13 @@ def choose_next_node(G, pheromone, current, visited, alpha=1.0, beta=2.0):
 # 'visited' seti – döngü oluşmasını engellemek için kullanılan kontrol listesi.
 # Eğer karınca sıkışırsa (ilerleyebileceği düğüm kalmazsa) None döner.
 
-def build_path(G, pheromone, S, D, alpha=1.0, beta=2.0):
+def build_path(G, pheromone, S, D, heuristic_map, alpha=1.0,  beta=2.0):
     current = S
     visited = {S}
     path = [S]
 
     while current != D:
-        next_node = choose_next_node(G, pheromone, current, visited, alpha, beta)
-
+        next_node = choose_next_node(G, pheromone, current, visited, heuristic_map, alpha, beta)
         if next_node is None:
             return None  # dead end
 
@@ -138,7 +139,6 @@ def deposit_pheromone(pheromone, path, cost, Q=1.0):
     for i in range(len(path) - 1):
         u = path[i]
         v = path[i + 1]
-
         pheromone[(u, v)] += amount
         pheromone[(v, u)] += amount
 
@@ -155,7 +155,15 @@ def deposit_pheromone(pheromone, path, cost, Q=1.0):
 def ACO(G, S, D,
         w_delay=0.33, w_rel=0.33, w_res=0.34,
         n_ants=20, n_iter=15,
-        alpha=1.0, beta=2.0, rho=0.1):
+        alpha=1.0, beta=3.0, rho=0.1):
+
+    # Pre-calculate heuristic based on USER weights
+    heuristic_map = {}
+    for u, v in G.edges():
+        edge_cost = compute_edge_cost(G, u, v, w_delay, w_rel, w_res)
+        h_val = 1.0 / max(0.0001, edge_cost)
+        heuristic_map[(u, v)] = h_val
+        heuristic_map[(v, u)] = h_val
 
     pheromone = initialize_pheromones(G)
     best_path = None
@@ -163,10 +171,8 @@ def ACO(G, S, D,
     best_metrics = None
 
     for iteration in range(n_iter):
-        print(f"\n--- Iteration {iteration + 1}/{n_iter} ---")
-
         for ant in range(n_ants):
-            path = build_path(G, pheromone, S, D, alpha, beta)
+            path = build_path(G, pheromone, S, D, heuristic_map, alpha, beta)
             if path is None:
                 continue
 
@@ -178,6 +184,10 @@ def ACO(G, S, D,
                 best_metrics = (td, rc, rs)
 
             deposit_pheromone(pheromone, path, cost)
+
+        # ELITISM: The best path found SO FAR deposits extra pheromones
+        if best_path:
+            deposit_pheromone(pheromone, best_path, best_cost, Q=2.0)
 
         evaporate_pheromone(pheromone, rho)
 
