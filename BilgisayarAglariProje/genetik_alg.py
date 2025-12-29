@@ -144,7 +144,7 @@ def crossover(p1, p2, G):
 # Mutasyon (GÜVENLİK KİLİDİ EKLENDİ)
 # ---------------------------------------------
 def mutate(path, G, rate=0.2):
-    # Direkt yol [S, D] gibi ise mutasyon yapılmaz
+    # Direkt yol [S, D] gibi ise mutasyon yapıl reveals
     if path is None or len(path) <= 2:
         return path
 
@@ -245,6 +245,18 @@ def run_ga(source, target, demand_bw,
     except ValueError as e:
         return {"best_path": None, "fitness": 0, "error": str(e)}
 
+    # EDGE CASE: Kaynak ve hedef aynıysa GA çalıştırmadan döndür
+    if source == target:
+        return {
+            "best_path": [source],
+            "fitness": 1.0,
+            "delay": 0.0,
+            "reliability": 1.0,
+            "cost": 0.0,
+            "min_bw": float("inf"),
+            "weights": {"w_delay": w_delay, "w_reliability": w_reliability, "w_resource": w_resource}
+        }
+
     best_path, best_fit = genetic_algorithm(
         source,
         target,
@@ -314,7 +326,7 @@ if __name__ == "__main__":
         print("Yol min bandwidth (bottleneck):", result["min_bw"])
         print("Weights:", result["weights"])
 
-        # ✅ Net kontrol
+        #  Net kontrol
         print("Demand:", demand_bw)
         print("Min BW:", result["min_bw"])
         print("Kısıt sağlandı mı?:", result["min_bw"] >= demand_bw)
