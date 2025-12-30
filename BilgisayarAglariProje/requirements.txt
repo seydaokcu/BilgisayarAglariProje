@@ -1,0 +1,6 @@
+flask
+pandas
+networkx
+matplotlib
+numpy
+tqdm
