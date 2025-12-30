@@ -53,8 +53,15 @@ def initialize_pheromones(G, initial=0.1):
 # Ziyaret edilen düğümlere tekrar dönmemek için 'visited' listesi kontrol edilir.
 # Bu fonksiyon ACO’nun çekirdeğidir: arama ve keşif burada gerçekleşir.
 
-def choose_next_node(G, pheromone, current, visited, heuristic_map, alpha=1.0, beta=2.0):
-    neighbors = list(G.neighbors(current))
+def choose_next_node(G, pheromone, current, visited, heuristic_map, alpha=1.0, beta=2.0, candidate_map=None):
+    # OPTIMIZATION: Use candidate list if available
+    if candidate_map is not None:
+        neighbors = candidate_map.get(current, [])
+        # Provide fallback if all candidates are visited (optional, but good for robustness options)
+        # For now, strict candidate list.
+    else:
+        neighbors = list(G.neighbors(current))
+        
     candidates = []
 
     for v in neighbors:
@@ -62,9 +69,16 @@ def choose_next_node(G, pheromone, current, visited, heuristic_map, alpha=1.0, b
             continue  # Prevent cycles
 
         tau = pheromone[(current, v)]
-        eta = heuristic_map[(current, v)]
+        # OPTIMIZATION: heuristic_map now holds (eta ** beta)
+        eta_pow_beta = heuristic_map[(current, v)]
 
-        candidates.append((v, (tau ** alpha) * (eta ** beta)))
+        # Optimization: fast path for alpha=1.0
+        if alpha == 1.0:
+            prob_val = tau * eta_pow_beta
+        else:
+            prob_val = (tau ** alpha) * eta_pow_beta
+
+        candidates.append((v, prob_val))
 
     if not candidates:
         return None
@@ -84,13 +98,13 @@ def choose_next_node(G, pheromone, current, visited, heuristic_map, alpha=1.0, b
 # 'visited' seti – döngü oluşmasını engellemek için kullanılan kontrol listesi.
 # Eğer karınca sıkışırsa (ilerleyebileceği düğüm kalmazsa) None döner.
 
-def build_path(G, pheromone, S, D, heuristic_map, alpha=1.0,  beta=2.0):
+def build_path(G, pheromone, S, D, heuristic_map, alpha=1.0,  beta=2.0, candidate_map=None):
     current = S
     visited = {S}
     path = [S]
 
     while current != D:
-        next_node = choose_next_node(G, pheromone, current, visited, heuristic_map, alpha, beta)
+        next_node = choose_next_node(G, pheromone, current, visited, heuristic_map, alpha, beta, candidate_map)
         if next_node is None:
             return None  # dead end
 
@@ -154,7 +168,7 @@ def deposit_pheromone(pheromone, path, cost, Q=1.0):
 
 def ACO(G, S, D,
         w_delay=0.33, w_rel=0.33, w_res=0.34,
-        n_ants=20, n_iter=15,
+        n_ants=25, n_iter=20,
         alpha=1.0, beta=3.0, rho=0.1):
 
     # Pre-calculate heuristic based on USER weights
@@ -162,17 +176,42 @@ def ACO(G, S, D,
     for u, v in G.edges():
         edge_cost = compute_edge_cost(G, u, v, w_delay, w_rel, w_res)
         h_val = 1.0 / max(0.0001, edge_cost)
-        heuristic_map[(u, v)] = h_val
-        heuristic_map[(v, u)] = h_val
+        
+        # OPTIMIZATION: Pre-calculate (heuristic ** beta) here
+        h_pow_beta = h_val ** beta
+        
+        heuristic_map[(u, v)] = h_pow_beta
+        heuristic_map[(v, u)] = h_pow_beta
+
+    # OPTIMIZATION: Pre-calc CANDIDATE LIST (Top K neighbors by heuristic)
+    candidate_map = {}
+    K_NEIGHBORS = 20
+    for node in G.nodes():
+        # Get all neighbors
+        nbrs = list(G.neighbors(node))
+        # Sort by heuristic value desc (higher = better/lower cost)
+        # Note: heuristic_map keys are (u, v)
+        # We did h_pow_beta calculation above.
+        
+        # Safe get for heuristic (undirected check)
+        def get_h(n):
+            return heuristic_map.get((node, n), 0)
+            
+        nbrs.sort(key=get_h, reverse=True)
+        candidate_map[node] = nbrs[:K_NEIGHBORS]
 
     pheromone = initialize_pheromones(G)
     best_path = None
     best_cost = float('inf')
     best_metrics = None
 
+    # EARLY STOPPING tracking
+    no_improve_count = 0
+    MAX_NO_IMPROVE = 5
+
     for iteration in range(n_iter):
         for ant in range(n_ants):
-            path = build_path(G, pheromone, S, D, heuristic_map, alpha, beta)
+            path = build_path(G, pheromone, S, D, heuristic_map, alpha, beta, candidate_map)
             if path is None:
                 continue
 
@@ -182,8 +221,15 @@ def ACO(G, S, D,
                 best_cost = cost
                 best_path = path
                 best_metrics = (td, rc, rs)
-
+                no_improve_count = 0 # Reset counter
+            
             deposit_pheromone(pheromone, path, cost)
+
+        # EARLY STOPPING CHECK
+        no_improve_count += 1
+        if no_improve_count >= MAX_NO_IMPROVE:
+            print(f"Early stop at iteration {iteration}")
+            break
 
         # ELITISM: The best path found SO FAR deposits extra pheromones
         if best_path:
