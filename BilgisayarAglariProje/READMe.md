@@ -21,6 +21,7 @@ Görselleştirme: Matplotlib
 Projeyi bilgisayarınızda çalıştırmak için:
 
 Projenin çalışması için Python 3.8+ gereklidir. Gerekli tüm kütüphaneleri tek seferde yüklemek için terminale şu komutu yazın:
+
 #pip install -r requirements.txt
 
 Tarayıcınızda http://127.0.0.1:5000 adresini açın.
@@ -36,15 +37,19 @@ Algoritmaların ACO_algorithm.py, genetik_alg.py ve QLearning_algorithm.py dosya
 Kod:random.seed(42) ve np.random.seed(42)
 
 1.Karınca Kolonisi Optimizasyonu (ACO)
+
 Doğadaki karıncaların yiyecek bulmak için bıraktıkları feromon izlerini taklit eder.
 
-İşleyiş: Her iterasyonda "karınca" olarak adlandırılan ajanlar, kaynak düğümden yola çıkar. Bir sonraki düğümü seçerken hem mevcut feromon miktarını (deneyim) hem de kenarın QoS maliyetini (sezgisel bilgi) dikkate alırlar.
+İşleyiş: Her iterasyonda "karınca" olarak adlandırılan ajanlar, kaynak düğümden yola çıkar. Bir sonraki düğümü seçerken hem mevcut feromon miktarını (deneyim)
+
+hem de kenarın QoS maliyetini (sezgisel bilgi) dikkate alırlar.
 
 Güncelleme:İyi sonuç veren yollardaki feromon miktarı artırılırken, kötü yollardaki feromonlar zamanla buharlaşır (evaporation).
 
 Projedeki Rolü:Dinamik ve olasılıksal yapısı sayesinde gecikme ve güvenilirlik dengesini kurmakta etkilidir.
 
 2.Genetik Algoritma (GA)
+
 Darwin’in evrim teorisindeki "en iyi olan hayatta kalır" prensibine dayanır.
 
 Popülasyon: Başlangıçta rastgele yollardan (bireylerden) oluşan bir küme oluşturulur.
@@ -56,11 +61,14 @@ Mutasyon: Rotalarda rastgele değişiklikler yapılarak algoritmanın yerel mini
 Projedeki Rolü: Çok geniş arama uzaylarında farklı QoS kombinasyonlarını keşfetmekte çok başarılıdır.
 
 3.Q-Learning (Pekiştirmeli Öğrenme)
+
 Bir ajanın çevreyle etkileşime girerek "deneme-yanılma" yoluyla öğrenmesini sağlar.
 
 Q-Tablosu: Her düğüm ve komşusu için bir "Q-değeri" (kalite değeri) tutulur.
 
-Ödül Mekanizması: Ajan hedefe ulaştığında, geçtiği yoldaki QoS değerlerine göre pozitif bir ödül alır. Eğer yol kısıtları (bant genişliği gibi) ihlal edilirse negatif ceza alır.
+Ödül Mekanizması: Ajan hedefe ulaştığında, geçtiği yoldaki QoS değerlerine göre pozitif bir ödül alır. Eğer yol kısıtları (bant genişliği gibi) ihlal edilirse
+
+negatif ceza alır.
 
 Eğitim:Binlerce iterasyon (episode) sonunda ajan, hangi düğümden hangisine gitmesi gerektiğini öğrenen bir harita (Q-Table) oluşturur.
 
@@ -69,6 +77,7 @@ Projedeki Rolü: Sabit topolojilerde bir kez eğitildikten sonra en hızlı ve e
 Arayüz üzerinden Kaynak Düğüm, Hedef Düğüm ve Bant Genişliği değerlerini girerek algoritmaları test edebilirsiniz.
 
 5.Optimizasyon metrikleri ve formülasyon 
+
 Proje, çok amaçlı bir optimizasyon problemini çözmekte olup, aşağıdaki formül (Weighted Sum Method) baz alınmıştır:
 
 $$Cost = (w delay*TotalDelay) + (w_reliability *(-log(Reliability))) + (w_resource*ResourceCost)
@@ -110,6 +119,7 @@ QLearning_algorithm.py:Pekiştirmeli öğrenme modülü.
 templates/: Arayüz dosyaları (HTML).
 
 7.Önemli notlar
+
 Yorum satırları: Her fonksiyonun üzerinde amacı, parametreleri ve dönüş değerleri detaylıca açıklanmıştır.
 
 Hata yönetimi: Kaynak ve hedef arasında yol bulunamadığı durumlarda sistem güvenli hata mesajları döndürmektedir.
