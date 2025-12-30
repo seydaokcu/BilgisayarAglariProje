@@ -128,11 +128,15 @@ class QLearningAgent:
         curr = start_node
         while curr != goal_node:
             neighbors = list(self.graph.neighbors(curr))
-            if not neighbors: break
-            
+            if not neighbors: return None # Değişiklik: Boş yol yerine None
+
             q_vals = {n: self.q_table[curr][n] for n in neighbors}
+        
+            # Eğer tüm Q değerleri 0 ise (hiç eğitim yapılamamışsa)
+            if all(v == 0.0 for v in q_vals.values()):
+                return None 
+
             best_action = max(q_vals, key=q_vals.get)
-            
             if best_action in path:
                 print("Döngü tespit edildi, duruluyor.")
                 break
@@ -142,7 +146,7 @@ class QLearningAgent:
             
             if len(path) > 50: break 
             
-        return path
+        return path if path[-1] == goal_node else None
 #================================
 # Q-Learn algoritmasını çalıştıran fonksiyon
 #================================

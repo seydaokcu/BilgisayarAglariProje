@@ -147,6 +147,10 @@ def calculate_route():
             # Epizot sayısı artırıldı (Kalite için 3000 -> 10000)
             agent.train(source, target, episodes=10000)
             final_path = agent.get_best_path(source, target)
+            if final_path is None:
+                return jsonify({
+                    "error": f"Q-Learning algoritması uygun yol bulamadı: source={source}, target={target}"
+                }), 400
 
         elif algorithm == "ACO":
             # Ants/Iter azaltıldı (Hız)
