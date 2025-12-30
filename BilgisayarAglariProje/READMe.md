@@ -1,15 +1,15 @@
 #bilgisayar Ağları projesi 
-1.Proje hakkında
+##1.Proje hakkında
 Bu proje,karmaşık bir ağ topolojisinde belirlenen QoS parametrelerine (gecikme, güvenilirlik, kaynak kullanımı) göre en optimal rotayı bulmaktır.
 ------------------------------------------------------------------------------------------------------------------------
-2.Kullanılan teknolojiler ve kütüphaneler
-Dil: Python 3.x
-Arayüz: Flask (Web tabanlı görselleştirme)
-Veri Analizi: Pandas, Numpy
-Graf İşlemleri: NetworkX
-Görselleştirme: Matplotlib
+##2.Kullanılan teknolojiler ve kütüphaneler
+**Dil:** Python 3.x
+**Arayüz:** Flask (Web tabanlı görselleştirme)
+**Veri Analizi:** Pandas, Numpy
+**Graf İşlemleri:** NetworkX
+**Görselleştirme:** Matplotlib
 -------------------------------------------------------------------------------------------------------------------------
-3.Çalıştırma adımları
+##3.Çalıştırma adımları
 Projeyi bilgisayarınızda çalıştırmak için:
 Projenin çalışması için Python 3.8+ gereklidir. Gerekli tüm kütüphaneleri tek seferde yüklemek için terminale şu komutu yazın:
 #pip install -r requirements.txt
