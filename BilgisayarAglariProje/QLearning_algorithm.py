@@ -9,7 +9,7 @@ import Ag_olusturma as ag
 
 class QLearningAgent:
     def __init__(self, graph, w_delay=0.33, w_reliability=0.33, w_resource=0.34,
-                 learning_rate=0.1, discount_factor=0.9, exploration_rate=1.0, exploration_decay=0.995):
+                 learning_rate=0.1, discount_factor=0.9, exploration_rate=1.0, exploration_decay=0.9992):
         self.graph = graph
         self.q_table = {}
         
@@ -35,11 +35,23 @@ class QLearningAgent:
     #================================
     def get_q_value(self, state, action):
         return self.q_table.get(state, {}).get(action, 0.0)
+    
+    #================================
+    # Heuristik fonksiyonu
+    #================================
+    def get_heuristic(self, u, v):
+        edge_data = self.graph.edges[u, v]
+        delay = edge_data.get('link_delay', 5)
+        rel = edge_data.get('link_reliability', 0.99)
+        bw = edge_data.get('bandwidth', 100)
+        # Maliyetler (delay, rel, bw) üzerinden bir "kalite" puanı hesaplar
+        cost_score = (self.w_delay * delay) + (self.w_reliability * (1-rel)*100) + (self.w_resource * (1000/bw))
+        return 1.0 / (cost_score + 1e-6) # Düşük maliyet = Yüksek öncelik
 
     #================================
     # Ödül hesaplama fonksiyonu
     #================================
-    def calculate_reward(self, u, v):
+    def calculate_reward(self, u, v, is_goal, step_count):
         # Node ve Edge verileri çekme
         edge_data = self.graph.edges[u, v]
         node_data = self.graph.nodes[v]
@@ -62,7 +74,14 @@ class QLearningAgent:
                      (self.w_reliability * rel_cost) + \
                      (self.w_resource * res_cost)
         
-        return -total_cost
+        reward = -total_cost
+
+        reward -= step_count * 0.5
+
+        if is_goal:
+            reward += 200
+        
+        return reward
 
     #================================
     # Eylem seçimi (ε-greedy)
@@ -72,7 +91,13 @@ class QLearningAgent:
         if not neighbors: return None
 
         if random.random() < self.exploration_rate:
-            return random.choice(neighbors)
+            h_values = [self.get_heuristic(state, n) for n in neighbors]
+            
+            # Koruma: Ağırlıklar toplamı 0 ise normal rastgele seç
+            if sum(h_values) <= 0:
+                return random.choice(neighbors)
+                
+            return random.choices(neighbors, weights=h_values, k=1)[0]
         else:
             q_values = {n: self.q_table[state][n] for n in neighbors}
             max_q = max(q_values.values())
@@ -104,21 +129,30 @@ class QLearningAgent:
         for episode in tqdm(range(episodes), desc="Eğitim İlerlemesi"):
             state = start_node
             steps = 0
+            visited = {start_node}
             
-            while state != goal_node and steps < 100:
+            while state != goal_node and steps < 50:
                 action = self.choose_action(state)
-                if action is None: break 
-                
-                reward = self.calculate_reward(state, action)
-                
-                if action == goal_node:
-                    reward += 1000 
 
-                self.update_q_value(state, action, reward, action)
+                if action is None or action in visited: 
+                    if action: # Sadece action varsa ceza ver (KeyError önleme)
+                        self.q_table[state][action] -= 10
+                    break
+                
+                reward = self.calculate_reward(state, action, action == goal_node, steps)
+                
+                next_neighbors = list(self.graph.neighbors(action))
+                max_next_q = max([self.q_table[action][n] for n in next_neighbors]) if next_neighbors else 0.0
+
+                self.q_table[state][action] += self.learning_rate * \
+                    (reward + self.discount_factor * max_next_q - self.q_table[state][action])
+
+                visited.add(action)
                 state = action
                 steps += 1
+
             
-            self.exploration_rate *= self.exploration_decay
+            self.exploration_rate = max(0.01, self.exploration_rate * self.exploration_decay)
 
     #================================
     # En iyi yolu bulma

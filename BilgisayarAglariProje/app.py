@@ -144,8 +144,8 @@ def calculate_route():
                 w_reliability=w_rel,
                 w_resource=w_res
             )
-            # Epizot sayısı artırıldı (Kalite için 3000 -> 10000)
-            agent.train(source, target, episodes=10000)
+            # Episode sayısını bilerek 3000'de tuttuk (Hız ve Performans için)
+            agent.train(source, target, episodes=3000)
             final_path = agent.get_best_path(source, target)
             if final_path is None:
                 return jsonify({
